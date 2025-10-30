@@ -1,0 +1,1734 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商城組態分析工具 - 增強版</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Inter 字體 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        /* 載入動畫 */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        /* 淡入動畫 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        /* 拖放區域樣式 */
+        #drop-zone.drag-over {
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        /* 收合狀態 */
+        #drop-zone.collapsed {
+            padding: 1rem;
+            cursor: pointer;
+        }
+        #drop-zone.collapsed .drop-zone-full {
+            display: none;
+        }
+        #drop-zone.collapsed .drop-zone-compact {
+            display: flex;
+        }
+        #drop-zone .drop-zone-compact {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- 標題和檔案上傳 -->
+        <header class="mb-6">
+            <div class="flex items-center justify-between mb-2">
+                <h1 class="text-3xl font-bold text-slate-800">商城組裝品組態分析工具</h1>
+                <div id="stats-badge" class="hidden bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium">
+                    <span id="product-count">0</span> 個產品 | <span id="component-count">0</span> 個元件
+                </div>
+            </div>
+            <p class="text-slate-600 mb-4">請上傳您的組態 CSV 檔案以開始分析。所有處理均在您的瀏覽器本機完成，資料絕不上傳至伺服器。</p>
+            
+            <!-- 相依相斥規則上傳按鈕 -->
+            <div class="mb-4">
+                <label for="compatibility-file-input" class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 cursor-pointer transition-colors shadow">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    匯入相依相斥規則表 (選填)
+                </label>
+                <input type="file" id="compatibility-file-input" accept=".csv" class="hidden"/>
+                <span id="compatibility-file-status" class="ml-3 text-sm text-slate-500"></span>
+            </div>
+            
+            <!-- 拖放區域 -->
+            <div id="drop-zone" class="bg-white p-8 rounded-lg shadow border-2 border-dashed border-slate-300 hover:border-indigo-400 transition-all cursor-pointer">
+                <!-- 完整顯示 -->
+                <div class="drop-zone-full text-center">
+                    <svg class="mx-auto h-12 w-12 text-slate-400 mb-4" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <p class="text-lg font-medium text-slate-700 mb-2">拖放 CSV 檔案到此處</p>
+                    <p class="text-sm text-slate-500 mb-4">或</p>
+                    <label for="file-input" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 cursor-pointer transition-colors">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        點擊選擇檔案
+                    </label>
+                    <input type="file" id="file-input" accept=".csv" class="hidden"/>
+                    <p class="mt-3 text-xs text-slate-500">支援格式：CSV (逗號分隔值)</p>
+                </div>
+                
+                <!-- 收合顯示 -->
+                <div class="drop-zone-compact items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <svg class="h-8 w-8 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                            <p class="font-medium text-slate-800" id="uploaded-file-name">檔案已上傳</p>
+                            <p class="text-sm text-slate-500">點擊重新上傳其他檔案</p>
+                        </div>
+                    </div>
+                    <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                </div>
+            </div>
+            <!-- 錯誤提示 -->
+            <div id="error-alert" class="hidden mt-4 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+                <div class="flex">
+                    <svg class="h-5 w-5 text-red-400 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                    <div>
+                        <p class="font-medium">處理錯誤</p>
+                        <p class="text-sm" id="error-message"></p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 載入中提示 -->
+        <div id="loading-indicator" class="hidden text-center p-12 bg-white rounded-lg shadow">
+            <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-indigo-600 border-r-transparent mb-4"></div>
+            <p class="text-lg font-medium text-slate-700">正在分析您的 CSV 檔案...</p>
+        </div>
+
+        <!-- 分析內容區域 -->
+        <main id="analysis-content" class="hidden">
+            <!-- 分頁導覽 -->
+            <nav class="flex flex-wrap border-b border-slate-300 mb-6" id="tabs">
+                <button data-tab="overview" class="tab-button py-3 px-4 font-medium text-slate-600 border-b-2 border-indigo-500 text-indigo-600">
+                    總覽
+                </button>
+                <button data-tab="complexity" class="tab-button py-3 px-4 font-medium text-slate-500 border-b-2 border-transparent hover:border-slate-400 hover:text-slate-700">
+                    產品組態排行
+                </button>
+                <button data-tab="commonality" class="tab-button py-3 px-4 font-medium text-slate-500 border-b-2 border-transparent hover:border-slate-400 hover:text-slate-700">
+                    子元件通用性
+                </button>
+                <button data-tab="compatibility" class="tab-button py-3 px-4 font-medium text-slate-500 border-b-2 border-transparent hover:border-slate-400 hover:text-slate-700">
+                    相依相斥規則
+                </button>
+            </nav>
+
+            <!-- 分頁內容 -->
+            <div id="tab-content" class="fade-in">
+                <!-- 內容將由 JS 動態填入 -->
+            </div>
+        </main>
+    </div>
+
+    <!-- 產品詳情 Modal -->
+    <div id="product-modal" class="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col">
+            <header class="p-4 md:p-6 border-b border-slate-200 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-800" id="modal-product-name">產品詳情</h2>
+                    <p class="text-sm text-slate-600 mt-1" id="modal-product-count">總組態數量：0</p>
+                </div>
+                <button id="modal-close-button" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </header>
+            <div class="p-4 md:p-6 overflow-y-auto no-scrollbar" id="modal-product-details"></div>
+        </div>
+    </div>
+
+    <!-- 子元件查詢 Modal -->
+    <div id="component-search-modal" class="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <header class="p-4 md:p-6 border-b border-slate-200 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-800">子元件查詢</h2>
+                    <p class="text-sm text-slate-600 mt-1">輸入元件料號，查詢所有使用該元件的產品清單</p>
+                </div>
+                <button id="component-search-modal-close" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </header>
+            <div class="p-4 md:p-6 overflow-y-auto no-scrollbar">
+                <div class="mb-4">
+                    <label for="component-search-input" class="block text-sm font-medium text-slate-700 mb-2">搜尋元件</label>
+                    <input 
+                        type="text" 
+                        id="component-search-input" 
+                        placeholder="輸入元件料號進行搜尋..." 
+                        class="w-full p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                </div>
+
+                <div class="mb-4">
+                    <label for="component-search-select" class="block text-sm font-medium text-slate-700 mb-2">或從列表選擇</label>
+                    <select id="component-search-select" class="w-full p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">-- 請選擇元件 --</option>
+                    </select>
+                </div>
+
+                <div id="component-search-results" class="mt-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 常數定義 ====================
+        const COLUMN_DEFINITIONS = {
+            PRODUCT_KEY: 'Product',
+            BASE: [
+                'Base Modules',
+                'Expansion Modules (Left Side)',
+                'EtherCAT Slice IO  (Right Side)'
+            ],
+            COMPONENT: [
+                'Processors',
+                'Memory',
+                'Storage',
+                'NVRAM Module',
+                'OS',
+                'Software',
+                'Expansion I/O'
+            ],
+            ADD_ON: [
+                'Accessories(MC)'
+            ]
+        };
+
+        const EMPTY_VALUES = ['', '-', 'N/A', 'n/a', 'NA', 'null', 'NULL'];
+
+        // ==================== 全域變數 ====================
+        let allProductsData = {};
+        let productConfigAnalysis = [];
+        let componentCommonality = [];
+        let rawCSVData = [];
+        let compatibilityRules = []; // 儲存相依相斥規則
+
+        // ==================== DOM 元素 ====================
+        const fileInput = document.getElementById('file-input');
+        const dropZone = document.getElementById('drop-zone');
+        const uploadedFileName = document.getElementById('uploaded-file-name');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const analysisContent = document.getElementById('analysis-content');
+        const tabContainer = document.getElementById('tabs');
+        const tabContent = document.getElementById('tab-content');
+        const errorAlert = document.getElementById('error-alert');
+        const errorMessage = document.getElementById('error-message');
+        const statsBadge = document.getElementById('stats-badge');
+        const productCountSpan = document.getElementById('product-count');
+        const componentCountSpan = document.getElementById('component-count');
+        
+        // 相依相斥規則相關元素
+        const compatibilityFileInput = document.getElementById('compatibility-file-input');
+        const compatibilityFileStatus = document.getElementById('compatibility-file-status');
+
+        // Modal 元素
+        const productModal = document.getElementById('product-modal');
+        const modalProductName = document.getElementById('modal-product-name');
+        const modalProductCount = document.getElementById('modal-product-count');
+        const modalProductDetails = document.getElementById('modal-product-details');
+        const modalCloseButton = document.getElementById('modal-close-button');
+
+        // 子元件查詢 Modal 元素
+        const componentSearchModal = document.getElementById('component-search-modal');
+        const componentSearchModalClose = document.getElementById('component-search-modal-close');
+        const componentSearchInput = document.getElementById('component-search-input');
+        const componentSearchSelect = document.getElementById('component-search-select');
+        const componentSearchResults = document.getElementById('component-search-results');
+
+        // ==================== 工具函式 ====================
+
+        /**
+         * 顯示錯誤訊息
+         */
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorAlert.classList.remove('hidden');
+            setTimeout(() => errorAlert.classList.add('hidden'), 5000);
+        }
+
+        /**
+         * 隱藏錯誤訊息
+         */
+        function hideError() {
+            errorAlert.classList.add('hidden');
+        }
+
+        /**
+         * 判斷值是否為空
+         */
+        function isEmpty(value) {
+            if (!value) return true;
+            const trimmed = String(value).trim();
+            return EMPTY_VALUES.includes(trimmed);
+        }
+
+        /**
+         * 解析相依相斥規則 CSV
+         * 新格式：Model 列表 + First-Product 組 + Second-Product 組 + Type
+         */
+        function parseCompatibilityRules(csvText) {
+            compatibilityRules = [];
+            
+            // 先處理跨行的引號字串
+            const lines = [];
+            const rawLines = csvText.split(/\r?\n/);
+            let i = 0;
+            
+            while (i < rawLines.length) {
+                let line = rawLines[i];
+                
+                // 如果這一行包含未閉合的引號，繼續讀取下一行
+                if (line.trim() !== '') {
+                    let quoteCount = (line.match(/"/g) || []).length;
+                    
+                    // 如果引號數量是奇數，表示跨行
+                    while (quoteCount % 2 !== 0 && i + 1 < rawLines.length) {
+                        i++;
+                        line += '\n' + rawLines[i];
+                        quoteCount = (line.match(/"/g) || []).length;
+                    }
+                    
+                    lines.push(line);
+                }
+                i++;
+            }
+            
+            console.log(`合併後共 ${lines.length} 行有效資料`);
+            
+            if (lines.length < 2) {
+                throw new Error("相依相斥規則表為空或只有標頭");
+            }
+
+            // 解析標頭
+            const headers = parseCSVLine(lines[0]);
+            console.log('CSV 標頭:', headers);
+            
+            // 找到關鍵欄位索引
+            const modelIndex = headers.findIndex(h => h.trim() === 'Model');
+            const typeIndex = headers.findIndex(h => h.trim() === 'Type');
+            
+            if (modelIndex === -1 || typeIndex === -1) {
+                throw new Error(`CSV 缺少必要欄位：${modelIndex === -1 ? 'Model' : 'Type'}`);
+            }
+            
+            // 動態尋找 First-Product 和 Second-Product 欄位
+            const firstProductIndices = [];
+            const secondProductIndices = [];
+            
+            headers.forEach((header, index) => {
+                const h = header.trim();
+                console.log(`檢查標頭 [${index}]: "${h}"`);
+                
+                // 匹配 "First-Product 1", "First-Product 2", "First-Product 3"
+                // 支援 First-Product 或 First Product，中間空格數量不限
+                if (/^First[-\s]*Product\s+\d+$/i.test(h)) {
+                    console.log(`  ✓ 匹配為 First-Product`);
+                    firstProductIndices.push(index);
+                }
+                // 匹配 "Second-Product 1", "Second-Product 2", "Second-Product 3"
+                else if (/^Second[-\s]*Product\s+\d+$/i.test(h)) {
+                    console.log(`  ✓ 匹配為 Second-Product`);
+                    secondProductIndices.push(index);
+                }
+            });
+            
+            console.log('First-Product 欄位索引:', firstProductIndices);
+            console.log('Second-Product 欄位索引:', secondProductIndices);
+            
+            if (firstProductIndices.length === 0) {
+                console.warn('警告：未找到 First-Product 相關欄位');
+            }
+            if (secondProductIndices.length === 0) {
+                console.warn('警告：未找到 Second-Product 相關欄位');
+            }
+
+            // 解析資料行
+            for (let i = 1; i < lines.length; i++) {
+                const values = parseCSVLine(lines[i]);
+                
+                console.log(`\n第 ${i} 行解析結果 (${values.length} 個欄位):`, values);
+                
+                // 讀取 Model 欄位（包含多個產品，用逗號和換行分隔）
+                const modelText = values[modelIndex]?.trim() || '';
+                
+                // 處理 Model 欄位：移除外層引號
+                let cleanedModelText = modelText;
+                if (cleanedModelText.startsWith('"') && cleanedModelText.endsWith('"')) {
+                    cleanedModelText = cleanedModelText.slice(1, -1);
+                }
+                
+                // 分割產品名稱（用逗號或換行分隔）
+                const models = cleanedModelText
+                    .split(/[,\n]+/)
+                    .map(m => {
+                        const trimmed = m.trim();
+                        // 移除 IMVirtue_ 前綴（如果存在）
+                        return trimmed.replace(/^IMVirtue_/i, '');
+                    })
+                    .filter(m => m && !isEmpty(m));
+                
+                console.log(`解析到 ${models.length} 個適用產品:`, models.slice(0, 3), models.length > 3 ? '...' : '');
+                
+                // 讀取 Type
+                const type = values[typeIndex]?.trim();
+                console.log(`Type (欄位 ${typeIndex}): "${type}"`);
+                
+                if (!type || (type !== 'Mandatory' && type !== 'Incompatible')) {
+                    console.log(`第 ${i} 行跳過：Type 無效或為空 (值: "${type}")`);
+                    continue;
+                }
+                
+                // 讀取 First-Product 組
+                const firstGroup = [];
+                firstProductIndices.forEach((idx, index) => {
+                    const val = values[idx]?.trim();
+                    console.log(`  First-Product ${index + 1} (欄位 ${idx}): "${val}"`);
+                    if (val && !isEmpty(val)) {
+                        firstGroup.push(val);
+                    }
+                });
+                console.log(`First Group (${firstGroup.length} 項):`, firstGroup);
+                
+                // 讀取 Second-Product 組
+                const secondGroup = [];
+                secondProductIndices.forEach((idx, index) => {
+                    const val = values[idx]?.trim();
+                    console.log(`  Second-Product ${index + 1} (欄位 ${idx}): "${val}"`);
+                    if (val && !isEmpty(val)) {
+                        secondGroup.push(val);
+                    }
+                });
+                console.log(`Second Group (${secondGroup.length} 項):`, secondGroup);
+                
+                // 只有當 First Group 和 Second Group 都有資料時才加入規則
+                if (firstGroup.length > 0 && secondGroup.length > 0 && models.length > 0) {
+                    console.log(`✅ 第 ${i} 行規則有效：${models.length} 個產品適用此規則`);
+                    compatibilityRules.push({
+                        models: models,
+                        firstGroup: firstGroup,
+                        secondGroup: secondGroup,
+                        type: type
+                    });
+                } else {
+                    console.log(`❌ 第 ${i} 行跳過：`, {
+                        'Model 數量': models.length,
+                        'First Group 數量': firstGroup.length,
+                        'Second Group 數量': secondGroup.length
+                    });
+                }
+            }
+            
+            console.log(`\n✅ 成功解析 ${compatibilityRules.length} 條相依相斥規則`);
+            return compatibilityRules.length;
+        }
+
+        /**
+         * 安全的 CSV 解析（處理引號內的逗號）
+         */
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+
+                if (char === '"') {
+                    if (inQuotes && nextChar === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+
+        /**
+         * 驗證單一配置是否符合相依相斥規則
+         * @param {Object} config - 配置物件，格式：{categoryName: selectedOption}
+         * @param {string} productName - 產品名稱
+         * @returns {boolean} - 是否有效
+         */
+        function validateConfiguration(config, productName) {
+            if (compatibilityRules.length === 0) return true;
+
+            // 取得所有選中的元件（排除 None）
+            const selectedComponents = new Set();
+            for (const category in config) {
+                const value = config[category];
+                if (!value) continue;
+                
+                // 處理 Add-on 多選的情況（陣列）
+                if (Array.isArray(value)) {
+                    value.forEach(v => {
+                        if (v && v !== 'None') {
+                            selectedComponents.add(v);
+                        }
+                    });
+                } else if (value !== 'None') {
+                    // 處理單選的情況（Base 和 Component）
+                    selectedComponents.add(value);
+                }
+            }
+
+            // 找出適用於此產品的規則
+            const applicableRules = compatibilityRules.filter(rule => 
+                rule.models.some(model => model === productName)
+            );
+
+            if (applicableRules.length === 0) return true;
+
+            // 檢查所有適用規則
+            for (const rule of applicableRules) {
+                // 檢查 First Group 是否有任一項目被選中
+                const hasFirstGroup = rule.firstGroup.some(item => selectedComponents.has(item));
+                // 檢查 Second Group 是否有任一項目被選中
+                const hasSecondGroup = rule.secondGroup.some(item => selectedComponents.has(item));
+
+                if (rule.type === 'Mandatory') {
+                    // 相依規則：如果選了 First Group 的任一項，必須選 Second Group 的任一項
+                    if (hasFirstGroup && !hasSecondGroup) {
+                        return false; // 違反相依規則
+                    }
+                } else if (rule.type === 'Incompatible') {
+                    // 互斥規則：First Group 和 Second Group 不能同時被選擇（雙向互斥）
+                    if (hasFirstGroup && hasSecondGroup) {
+                        return false; // 違反互斥規則
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        /**
+         * 計算有效配置數量（使用笛卡爾積枚舉）
+         * @param {Array} categoryArrays - 類別選項陣列 [{name, options}, ...]
+         * @param {string} productName - 產品名稱
+         * @returns {number} - 有效配置數量
+         */
+        function calculateValidConfigurations(categoryArrays, productName) {
+            if (compatibilityRules.length === 0) {
+                // 沒有規則時，返回理論最大值
+                let total = 1;
+                categoryArrays.forEach(cat => {
+                    if (COLUMN_DEFINITIONS.ADD_ON.includes(cat.name)) {
+                        // Add-on 是 2^n 組合
+                        const nonNoneOptions = cat.options.filter(opt => opt !== 'None');
+                        total *= Math.pow(2, nonNoneOptions.length);
+                    } else {
+                        total *= cat.options.length;
+                    }
+                });
+                return total;
+            }
+
+            // 檢查是否有適用的規則
+            const applicableRules = compatibilityRules.filter(rule => 
+                rule.models.some(model => model === productName)
+            );
+            
+            console.log(`\n📊 計算 ${productName} 的有效配置：`);
+            console.log(`  總規則數: ${compatibilityRules.length}`);
+            console.log(`  適用規則數: ${applicableRules.length}`);
+            
+            if (applicableRules.length > 0) {
+                console.log(`  規則詳情:`, applicableRules.map(r => ({
+                    type: r.type,
+                    first: r.firstGroup,
+                    second: r.secondGroup
+                })));
+            } else if (compatibilityRules.length > 0) {
+                // 除錯：顯示為什麼沒有匹配
+                console.log(`  ⚠️ 沒有適用的規則！`);
+                console.log(`  產品名稱: "${productName}"`);
+                console.log(`  規則中的產品範例:`, compatibilityRules[0].models.slice(0, 3));
+            }
+
+            // 有規則時，需要枚舉所有配置並驗證
+            let validCount = 0;
+            let totalCount = 0;
+            let invalidReasons = {};
+            
+            // 準備遞迴枚舉的函數
+            function enumerateConfigs(index, currentConfig) {
+                if (index === categoryArrays.length) {
+                    // 到達葉節點，驗證配置
+                    totalCount++;
+                    const isValid = validateConfiguration(currentConfig, productName);
+                    if (isValid) {
+                        validCount++;
+                    } else {
+                        // 記錄無效原因（用於除錯）
+                        const configStr = JSON.stringify(currentConfig);
+                        if (!invalidReasons[configStr]) {
+                            invalidReasons[configStr] = true;
+                        }
+                    }
+                    return;
+                }
+
+                const category = categoryArrays[index];
+                
+                if (COLUMN_DEFINITIONS.ADD_ON.includes(category.name)) {
+                    // Add-on 類別：枚舉所有子集（2^n 組合）
+                    const nonNoneOptions = category.options.filter(opt => opt !== 'None');
+                    const subsetCount = Math.pow(2, nonNoneOptions.length);
+                    
+                    for (let i = 0; i < subsetCount; i++) {
+                        const subset = [];
+                        for (let j = 0; j < nonNoneOptions.length; j++) {
+                            if (i & (1 << j)) {
+                                subset.push(nonNoneOptions[j]);
+                            }
+                        }
+                        
+                        const newConfig = {...currentConfig};
+                        newConfig[category.name] = subset.length > 0 ? subset : ['None'];
+                        enumerateConfigs(index + 1, newConfig);
+                    }
+                } else {
+                    // Base 或 Component 類別：單選
+                    category.options.forEach(option => {
+                        const newConfig = {...currentConfig};
+                        newConfig[category.name] = option;
+                        enumerateConfigs(index + 1, newConfig);
+                    });
+                }
+            }
+
+            enumerateConfigs(0, {});
+            
+            console.log(`  枚舉總數: ${totalCount}, 有效配置: ${validCount}, 過濾率: ${((1 - validCount/totalCount) * 100).toFixed(1)}%`);
+            
+            return validCount;
+        }
+
+        // ==================== 核心邏輯 ====================
+
+        /**
+         * 處理檔案（統一入口）
+         */
+        function handleFile(file) {
+            if (!file) {
+                showError('未選擇檔案');
+                return;
+            }
+
+            // 驗證檔案類型
+            if (!file.name.endsWith('.csv')) {
+                showError('請上傳 CSV 格式的檔案');
+                return;
+            }
+
+            hideError();
+            loadingIndicator.classList.remove('hidden');
+
+            // 模擬非同步處理
+            setTimeout(() => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const csvText = e.target.result;
+                        parseCSV(csvText);
+                        runAllAnalyses();
+                        renderUI();
+                        loadingIndicator.classList.add('hidden');
+                        
+                        // 收合拖放區域並顯示檔案名稱
+                        dropZone.classList.add('collapsed');
+                        uploadedFileName.textContent = file.name;
+                    } catch (error) {
+                        console.error("處理 CSV 時發生錯誤:", error);
+                        showError(`檔案處理失敗：${error.message}`);
+                        loadingIndicator.classList.add('hidden');
+                    }
+                };
+                reader.onerror = () => {
+                    showError('檔案讀取失敗，請確認檔案格式是否正確');
+                    loadingIndicator.classList.add('hidden');
+                };
+                reader.readAsText(file, 'UTF-8');
+            }, 100);
+        }
+
+        /**
+         * 處理相依相斥規則檔案上傳
+         */
+        compatibilityFileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.name.endsWith('.csv')) {
+                showError('請上傳 CSV 格式的相依相斥規則表');
+                compatibilityFileStatus.textContent = '';
+                return;
+            }
+
+            compatibilityFileStatus.innerHTML = '<span class="text-blue-600">⏳ 正在載入...</span>';
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const csvText = e.target.result;
+                    const ruleCount = parseCompatibilityRules(csvText);
+                    compatibilityFileStatus.innerHTML = `<span class="text-green-600">✓ 已載入 ${ruleCount} 條規則，正在重新計算...</span>`;
+                    
+                    // 如果已經有產品資料，重新執行分析
+                    if (Object.keys(allProductsData).length > 0) {
+                        console.log('\n🔄 重新計算所有產品的有效組態數量...');
+                        loadingIndicator.classList.remove('hidden');
+                        
+                        // 使用 setTimeout 讓 UI 有時間更新
+                        setTimeout(() => {
+                            runAllAnalyses();
+                            renderUI();
+                            loadingIndicator.classList.add('hidden');
+                            compatibilityFileStatus.innerHTML = `<span class="text-green-600">✓ 已套用 ${ruleCount} 條規則</span>`;
+                            
+                            // 自動切換到總覽頁面以顯示更新後的結果
+                            switchTab('overview');
+                        }, 100);
+                    } else {
+                        compatibilityFileStatus.innerHTML = `<span class="text-green-600">✓ 已載入 ${ruleCount} 條規則</span>`;
+                    }
+                } catch (error) {
+                    console.error("處理相依相斥規則表時發生錯誤:", error);
+                    showError(`規則表處理失敗：${error.message}`);
+                    compatibilityFileStatus.innerHTML = '<span class="text-red-600">✗ 載入失敗</span>';
+                }
+            };
+            reader.onerror = () => {
+                showError('規則表讀取失敗');
+                compatibilityFileStatus.innerHTML = '<span class="text-red-600">✗ 讀取失敗</span>';
+            };
+            reader.readAsText(file, 'UTF-8');
+        });
+
+        /**
+         * 處理檔案上傳（點擊選擇）
+         */
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            handleFile(file);
+        });
+
+        /**
+         * 拖放區域事件監聽器
+         */
+        // 防止瀏覽器預設行為
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // 拖放視覺效果
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('drag-over');
+            }, false);
+        });
+
+        // 處理放下檔案
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }, false);
+
+        // 點擊拖放區域觸發檔案選擇
+        dropZone.addEventListener('click', (e) => {
+            // 避免點擊 label 時重複觸發
+            if (e.target.tagName !== 'LABEL' && e.target.tagName !== 'INPUT') {
+                // 如果是收合狀態，重置 input 以允許重新上傳相同檔案
+                if (dropZone.classList.contains('collapsed')) {
+                    fileInput.value = '';
+                }
+                fileInput.click();
+            }
+        });
+
+        /**
+         * 解析 CSV 檔案
+         */
+        function parseCSV(csvText) {
+            allProductsData = {};
+            rawCSVData = [];
+
+            const lines = csvText.split(/\r?\n/).filter(line => line.trim() !== '');
+            if (lines.length < 2) {
+                throw new Error("CSV 檔案為空或只有標頭，請確認檔案內容");
+            }
+
+            // 解析標頭
+            const headers = parseCSVLine(lines[0]);
+            const productColIndex = headers.findIndex(h => h.trim() === COLUMN_DEFINITIONS.PRODUCT_KEY);
+            
+            if (productColIndex === -1) {
+                throw new Error(`CSV 中缺少必要欄位：${COLUMN_DEFINITIONS.PRODUCT_KEY}`);
+            }
+
+            // 建立欄位索引映射
+            const categoryCols = [
+                ...COLUMN_DEFINITIONS.BASE,
+                ...COLUMN_DEFINITIONS.COMPONENT,
+                ...COLUMN_DEFINITIONS.ADD_ON
+            ];
+
+            const colIndices = {};
+            categoryCols.forEach(colName => {
+                const index = headers.findIndex(h => h.trim() === colName);
+                if (index > -1) {
+                    colIndices[colName] = index;
+                }
+            });
+
+            // 解析資料行
+            let validRowCount = 0;
+            for (let i = 1; i < lines.length; i++) {
+                const values = parseCSVLine(lines[i]);
+                const productName = values[productColIndex]?.trim();
+
+                if (!productName || isEmpty(productName)) continue;
+
+                validRowCount++;
+
+                // 初始化產品資料結構
+                if (!allProductsData[productName]) {
+                    allProductsData[productName] = {};
+                }
+
+                // 儲存原始資料
+                const rowData = { product: productName };
+                for (const colName in colIndices) {
+                    const colIndex = colIndices[colName];
+                    const value = values[colIndex]?.trim();
+                    rowData[colName] = isEmpty(value) ? null : value;
+                }
+                rawCSVData.push(rowData);
+
+                // 蒐集唯一選項
+                for (const colName in colIndices) {
+                    const colIndex = colIndices[colName];
+                    const value = values[colIndex]?.trim();
+
+                    if (!isEmpty(value)) {
+                        if (!allProductsData[productName][colName]) {
+                            allProductsData[productName][colName] = new Set();
+                        }
+                        allProductsData[productName][colName].add(value);
+                    }
+                }
+            }
+
+            if (validRowCount === 0) {
+                throw new Error("CSV 檔案中沒有有效的產品資料");
+            }
+
+            console.log(`成功解析 ${validRowCount} 行資料，共 ${Object.keys(allProductsData).length} 個產品`);
+        }
+
+        /**
+         * 執行所有分析
+         */
+        function runAllAnalyses() {
+            productConfigAnalysis = [];
+            const componentUsage = {};
+
+            // 分析每個產品的複雜度
+            for (const productName in allProductsData) {
+                const categories = allProductsData[productName];
+                let totalCombinations = 1;
+                const detailedChoices = [];
+                const categoryArrays = [];
+
+                for (const colName in categories) {
+                    const optionsSet = categories[colName];
+                    if (optionsSet.size === 0) continue;
+
+                    const options = Array.from(optionsSet).sort();
+                    let categoryType = '';
+                    let rule = '';
+                    let finalOptions = [];
+                    let choiceCount = 0;
+
+                    if (COLUMN_DEFINITIONS.BASE.includes(colName)) {
+                        categoryType = 'Base';
+                        rule = '必選';
+                        finalOptions = options;
+                        choiceCount = options.length;
+                    } else if (COLUMN_DEFINITIONS.COMPONENT.includes(colName)) {
+                        categoryType = 'Component';
+                        rule = '可選';
+                        finalOptions = [...options, 'None'];
+                        choiceCount = options.length + 1;
+                    } else if (COLUMN_DEFINITIONS.ADD_ON.includes(colName)) {
+                        categoryType = 'Add-on';
+                        rule = '多選';
+                        finalOptions = [...options, 'None'];
+                        // Add-on 可以多選：包含「無」選項，加上所有可能的配件組合
+                        // 可以選擇：無、單個配件、多個配件的任意組合
+                        choiceCount = Math.pow(2, options.length);
+                    }
+
+                    if (choiceCount > 0) {
+                        totalCombinations *= choiceCount;
+                        detailedChoices.push({
+                            category: colName,
+                            categoryType: categoryType,
+                            rule: rule,
+                            count: choiceCount,
+                            options: finalOptions
+                        });
+                        categoryArrays.push({
+                            name: colName,
+                            options: finalOptions
+                        });
+                    }
+
+                    // 蒐集元件通用性資料
+                    options.forEach(opt => {
+                        if (!componentUsage[opt]) {
+                            componentUsage[opt] = {
+                                products: new Set(),
+                                categories: new Set()
+                            };
+                        }
+                        componentUsage[opt].products.add(productName);
+                        componentUsage[opt].categories.add(colName);
+                    });
+                }
+
+                // 計算有效配置數量（考慮相依相斥規則）
+                const validCount = calculateValidConfigurations(categoryArrays, productName);
+
+                // 計算基礎組態數量（排除 Add-on）
+                let baseCombinations = 1;
+                detailedChoices.forEach(choice => {
+                    if (!COLUMN_DEFINITIONS.ADD_ON.includes(choice.category)) {
+                        baseCombinations *= choice.count;
+                    }
+                });
+
+                productConfigAnalysis.push({
+                    name: productName,
+                    count: validCount, // 使用過濾後的有效配置數
+                    theoreticalCount: totalCombinations, // 保留理論最大值供參考
+                    baseCount: baseCombinations, // 基礎組態數量（不含 Add-on）
+                    details: detailedChoices,
+                    categoryArrays: categoryArrays
+                });
+            }
+
+            // 排序產品複雜度
+            productConfigAnalysis.sort((a, b) => b.count - a.count);
+
+            // 整理元件通用性結果
+            componentCommonality = [];
+            for (const componentName in componentUsage) {
+                const data = componentUsage[componentName];
+                componentCommonality.push({
+                    name: componentName,
+                    count: data.products.size,
+                    products: Array.from(data.products).sort(),
+                    categories: Array.from(data.categories).sort()
+                });
+            }
+
+            // 排序元件通用性
+            componentCommonality.sort((a, b) => b.count - a.count);
+
+            console.log(`分析完成：${productConfigAnalysis.length} 個產品，${componentCommonality.length} 個元件`);
+        }
+
+        /**
+         * 渲染 UI
+         */
+        function renderUI() {
+            loadingIndicator.classList.add('hidden');
+            analysisContent.classList.remove('hidden');
+            statsBadge.classList.remove('hidden');
+
+            // 更新統計徽章
+            productCountSpan.textContent = productConfigAnalysis.length;
+            componentCountSpan.textContent = componentCommonality.length;
+
+            // 預設顯示總覽
+            renderOverviewTab();
+        }
+
+        // ==================== 渲染各分頁 ====================
+
+        /**
+         * 渲染總覽分頁
+         */
+        function renderOverviewTab() {
+            const totalConfigs = productConfigAnalysis.reduce((sum, p) => sum + p.count, 0);
+            const totalTheoretical = productConfigAnalysis.reduce((sum, p) => sum + (p.theoreticalCount || p.count), 0);
+            const totalBase = productConfigAnalysis.reduce((sum, p) => sum + (p.baseCount || 0), 0);
+            const mostComplex = productConfigAnalysis[0];
+            const leastComplex = productConfigAnalysis[productConfigAnalysis.length - 1];
+            const mostCommon = componentCommonality[0];
+
+            // 計算產品系列數量（根據第一個 "-" 前的前綴）
+            const productSeries = new Set();
+            productConfigAnalysis.forEach(product => {
+                const seriesPrefix = product.name.split('-')[0];
+                if (seriesPrefix) {
+                    productSeries.add(seriesPrefix);
+                }
+            });
+
+            // 相依相斥規則統計
+            const mandatoryCount = compatibilityRules.filter(r => r.type === 'Mandatory').length;
+            const incompatibleCount = compatibilityRules.filter(r => r.type === 'Incompatible').length;
+            const hasRules = compatibilityRules.length > 0;
+            const filtered = hasRules && totalTheoretical > totalConfigs;
+            const filterRate = filtered ? ((1 - totalConfigs / totalTheoretical) * 100).toFixed(1) : 0;
+
+            const html = `
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">產品總數</h3>
+                        <p class="text-3xl font-bold text-slate-800">${productConfigAnalysis.length}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">元件總數</h3>
+                        <p class="text-3xl font-bold text-slate-800">${componentCommonality.length}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">${filtered ? '有效組態數量' : '總組態數量'}</h3>
+                        <p class="text-3xl font-bold ${filtered ? 'text-green-600' : 'text-slate-800'}">${totalConfigs.toLocaleString()}</p>
+                        ${totalBase > 0 ? `<p class="text-xs text-slate-500 mt-1">基礎組態：${totalBase.toLocaleString()}</p>` : ''}
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">產品系列</h3>
+                        <p class="text-3xl font-bold text-slate-800">${productSeries.size}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">最複雜產品</h3>
+                        <p class="text-lg font-semibold text-slate-800 truncate" title="${mostComplex?.name}">${mostComplex?.name || 'N/A'}</p>
+                        <p class="text-sm text-slate-500">${(mostComplex?.count || 0).toLocaleString()} 種組態</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">最通用元件</h3>
+                        <p class="text-lg font-semibold text-slate-800 truncate" title="${mostCommon?.name}">${mostCommon?.name || 'N/A'}</p>
+                        <p class="text-sm text-slate-500">被 ${mostCommon?.count || 0} 個產品使用</p>
+                    </div>
+                </div>
+
+                ${hasRules ? `
+                <div class="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-lg shadow mb-6 border border-purple-200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-800 mb-2">相依相斥規則 ${filtered ? '✓ 已套用' : ''}</h3>
+                            <p class="text-sm text-slate-600 mb-3">已載入 ${compatibilityRules.length} 條規則${filtered ? `，過濾掉 ${(totalTheoretical - totalConfigs).toLocaleString()} 個無效組態 (${filterRate}%)` : ''}</p>
+                            <div class="flex gap-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 bg-green-500 rounded-full"></span>
+                                    <span class="text-sm text-slate-700">${mandatoryCount} 條相依規則</span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 bg-red-500 rounded-full"></span>
+                                    <span class="text-sm text-slate-700">${incompatibleCount} 條相斥規則</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="switchTab('compatibility')" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm font-medium">
+                            查看詳情
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="bg-white p-6 rounded-lg shadow mb-6">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">產品系列</h3>
+                    <div class="flex flex-wrap gap-2">
+                        ${Array.from(productSeries).sort().map(series => `
+                            <span class="px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-full text-sm font-medium border border-indigo-200">
+                                ${series}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow mb-6">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-4">產品組態排行</h3>
+                    <div class="space-y-2">
+                        ${productConfigAnalysis.slice(0, 5).map((product, index) => {
+                            const percentage = (product.count / mostComplex.count) * 100;
+                            return `
+                                <div>
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="font-medium text-slate-700">${product.name}</span>
+                                        <span class="text-slate-600">${product.count.toLocaleString()}</span>
+                                    </div>
+                                    <div class="w-full bg-slate-200 rounded-full h-2">
+                                        <div class="bg-indigo-600 h-2 rounded-full" style="width: ${percentage}%"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+            tabContent.innerHTML = html;
+        }
+
+        /**
+         * 渲染產品複雜度分頁
+         */
+        function renderComplexityTab() {
+            const html = `
+                <div class="mb-4 bg-white p-4 rounded-lg shadow">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">產品組態複雜度排行榜</h3>
+                    <p class="text-sm text-slate-600">展示每個產品可能的組態數量（點擊查看詳情）</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${productConfigAnalysis.map((product, index) => {
+                        const rankColor = index === 0 ? 'bg-yellow-100 text-yellow-700' : 
+                                        index === 1 ? 'bg-slate-200 text-slate-700' : 
+                                        index === 2 ? 'bg-orange-100 text-orange-700' : 
+                                        'bg-indigo-100 text-indigo-600';
+                        return `
+                            <button 
+                                class="product-item-button bg-white p-4 rounded-lg shadow text-left hover:shadow-lg hover:scale-105 transition-all"
+                                data-product-name="${product.name}"
+                            >
+                                <div class="flex items-center space-x-3">
+                                    <span class="flex-shrink-0 w-10 h-10 rounded-full ${rankColor} font-bold flex items-center justify-center text-sm">
+                                        ${index + 1}
+                                    </span>
+                                    <div class="flex-1 min-w-0">
+                                        <p class="font-semibold text-slate-800 truncate" title="${product.name}">${product.name}</p>
+                                        <p class="text-sm text-slate-500">${product.count.toLocaleString()} 種組態</p>
+                                        <p class="text-xs text-slate-400">${product.details.length} 個類別 | ${(product.baseCount || 0).toLocaleString()} 種基礎組態</p>
+                                    </div>
+                                </div>
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+            tabContent.innerHTML = html;
+        }
+
+        /**
+         * 渲染元件通用性分頁
+         */
+        function renderCommonalityTab() {
+            // 初始排序狀態
+            if (!window.componentSortState) {
+                window.componentSortState = {
+                    column: 'count', // 預設按使用產品數排序
+                    order: 'desc'
+                };
+            }
+            
+            const html = `
+                <div class="mb-4 bg-white p-4 rounded-lg shadow">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-slate-800 mb-2">元件通用性分析</h3>
+                            <p class="text-sm text-slate-600">統計每個元件被多少個不同產品所使用（點擊表頭可排序）</p>
+                        </div>
+                        <button id="open-component-search" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors shadow flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            子元件查詢
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">排名</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortComponentTable('name')">
+                                        <div class="flex items-center gap-2">
+                                            元件料號
+                                            <span class="sort-indicator ${window.componentSortState.column === 'name' ? 'active' : ''}">${window.componentSortState.column === 'name' ? (window.componentSortState.order === 'asc' ? '▲' : '▼') : '⇅'}</span>
+                                        </div>
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">使用類別</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors" onclick="sortComponentTable('count')">
+                                        <div class="flex items-center gap-2">
+                                            使用產品數
+                                            <span class="sort-indicator ${window.componentSortState.column === 'count' ? 'active' : ''}">${window.componentSortState.column === 'count' ? (window.componentSortState.order === 'asc' ? '▲' : '▼') : '⇅'}</span>
+                                        </div>
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">產品範例</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-slate-200" id="component-table-body">
+                                ${getSortedComponents().map((component, index) => `
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${index + 1}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <p class="text-sm font-medium text-slate-900">${component.name}</p>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="flex flex-wrap gap-1">
+                                                ${component.categories.map(cat => `
+                                                    <span class="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">${cat}</span>
+                                                `).join('')}
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="text-sm font-semibold text-indigo-600 bg-indigo-50 py-1 px-3 rounded-full">
+                                                ${component.count} 個
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <p class="text-sm text-slate-500 truncate max-w-xs" title="${component.products.join(', ')}">
+                                                ${component.products.slice(0, 2).join(', ')}${component.products.length > 2 ? '...' : ''}
+                                            </p>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            tabContent.innerHTML = html;
+            
+            // 綁定按鈕事件
+            document.getElementById('open-component-search').addEventListener('click', openComponentSearchModal);
+        }
+
+        /**
+         * 取得排序後的元件列表
+         */
+        function getSortedComponents() {
+            const sorted = [...componentCommonality];
+            const state = window.componentSortState;
+            
+            sorted.sort((a, b) => {
+                let compareValue = 0;
+                
+                if (state.column === 'name') {
+                    compareValue = a.name.localeCompare(b.name);
+                } else if (state.column === 'count') {
+                    compareValue = a.count - b.count;
+                }
+                
+                return state.order === 'asc' ? compareValue : -compareValue;
+            });
+            
+            return sorted;
+        }
+
+        /**
+         * 排序元件表格
+         */
+        window.sortComponentTable = function(column) {
+            const state = window.componentSortState;
+            
+            // 如果點擊同一欄位，切換排序順序；否則使用預設順序
+            if (state.column === column) {
+                state.order = state.order === 'asc' ? 'desc' : 'asc';
+            } else {
+                state.column = column;
+                state.order = column === 'count' ? 'desc' : 'asc'; // 數量預設降序，名稱預設升序
+            }
+            
+            // 重新渲染表格
+            renderCommonalityTab();
+        };
+
+        /**
+         * 渲染相依相斥規則分頁
+         */
+        function renderCompatibilityTab() {
+            if (compatibilityRules.length === 0) {
+                tabContent.innerHTML = `
+                    <div class="bg-white p-12 rounded-lg shadow text-center">
+                        <svg class="mx-auto h-16 w-16 text-slate-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p class="text-lg font-medium text-slate-700 mb-2">尚未載入相依相斥規則表</p>
+                        <p class="text-sm text-slate-500">請點擊上方的「匯入相依相斥規則表」按鈕來載入規則</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 統計規則類型
+            const mandatoryRules = compatibilityRules.filter(r => r.type === 'Mandatory');
+            const incompatibleRules = compatibilityRules.filter(r => r.type === 'Incompatible');
+
+            // 統計影響的產品數量
+            const affectedProducts = new Set();
+            compatibilityRules.forEach(rule => {
+                rule.models.forEach(model => affectedProducts.add(model));
+            });
+
+            const html = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">總規則數</h3>
+                        <p class="text-3xl font-bold text-slate-800">${compatibilityRules.length}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">相依規則 (Mandatory)</h3>
+                        <p class="text-3xl font-bold text-green-600">${mandatoryRules.length}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-sm font-medium text-slate-600 mb-2">相斥規則 (Incompatible)</h3>
+                        <p class="text-3xl font-bold text-red-600">${incompatibleRules.length}</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 rounded-lg shadow mb-6">
+                    <h3 class="text-lg font-semibold text-slate-800 mb-2">規則說明</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div class="border-l-4 border-green-500 pl-4">
+                            <p class="font-medium text-green-700 mb-1">Mandatory (相依)</p>
+                            <p class="text-slate-600">如果選擇了 First Group 中的<strong>任一項目</strong>，則<strong>必須</strong>選擇 Second Group 中的<strong>任一項目</strong></p>
+                            <p class="text-xs text-slate-500 mt-1">邏輯：First Group (OR) → Second Group (至少選一)</p>
+                        </div>
+                        <div class="border-l-4 border-red-500 pl-4">
+                            <p class="font-medium text-red-700 mb-1">Incompatible (相斥)</p>
+                            <p class="text-slate-600">First Group 和 Second Group <strong>不能同時選擇</strong>。只能選擇其中一組，或兩組都不選</p>
+                            <p class="text-xs text-slate-500 mt-1">邏輯：First Group ⊕ Second Group (互斥，雙向限制)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b border-slate-200">
+                        <h3 class="text-lg font-semibold text-slate-800">規則列表</h3>
+                        <p class="text-sm text-slate-600 mt-1">共 ${compatibilityRules.length} 條規則</p>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-200">
+                            <thead class="bg-slate-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">#</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">規則類型</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">First Group (條件)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Second Group (結果)</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">適用產品</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-slate-200">
+                                ${compatibilityRules.map((rule, index) => {
+                                    const typeColor = rule.type === 'Mandatory' ? 'green' : 'red';
+                                    const typeLabel = rule.type === 'Mandatory' ? '相依' : '相斥';
+                                    return `
+                                        <tr class="hover:bg-slate-50">
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${index + 1}</td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-3 py-1 text-xs font-medium rounded-full bg-${typeColor}-100 text-${typeColor}-700">
+                                                    ${typeLabel}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="flex flex-wrap gap-1">
+                                                    ${rule.firstGroup.map(item => `
+                                                        <span class="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">${item}</span>
+                                                    `).join('')}
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="flex flex-wrap gap-1">
+                                                    ${rule.secondGroup.map(item => `
+                                                        <span class="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-200">${item}</span>
+                                                    `).join('')}
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <p class="text-sm text-slate-600 truncate max-w-xs" title="${rule.models.join(', ')}">
+                                                    ${rule.models.length > 2 ? `${rule.models.slice(0, 2).join(', ')}... (+${rule.models.length - 2})` : rule.models.join(', ')}
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            tabContent.innerHTML = html;
+        }
+
+        /**
+         * 渲染反向元件查詢分頁
+         */
+        function renderReverseSearchTab() {
+            // 此功能已移至元件通用性分析頁面的 Modal
+            // 保留此函數以防舊代碼調用
+        }
+
+        /**
+         * 開啟子元件查詢 Modal
+         */
+        function openComponentSearchModal() {
+            const allComponents = componentCommonality.map(c => c.name).sort();
+            
+            // 填充選擇列表
+            componentSearchSelect.innerHTML = '<option value="">-- 請選擇元件 --</option>' +
+                allComponents.map(name => `<option value="${name}">${name}</option>`).join('');
+            
+            // 清空搜尋
+            componentSearchInput.value = '';
+            componentSearchResults.innerHTML = '';
+            
+            componentSearchModal.classList.remove('hidden');
+        }
+
+        /**
+         * 顯示反向查詢結果
+         */
+        function displayReverseSearchResults(component, container) {
+            container.innerHTML = `
+                <div class="bg-slate-50 p-4 rounded-lg">
+                    <h4 class="font-semibold text-slate-800 mb-2">元件資訊</h4>
+                    <p class="text-sm text-slate-600 mb-4">
+                        <span class="font-medium">${component.name}</span> 被 
+                        <span class="font-bold text-indigo-600">${component.count}</span> 個產品使用
+                    </p>
+                    <div class="mb-3">
+                        <p class="text-sm font-medium text-slate-700 mb-2">使用類別：</p>
+                        <div class="flex flex-wrap gap-2">
+                            ${component.categories.map(cat => `
+                                <span class="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">${cat}</span>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <h4 class="font-semibold text-slate-800 mb-2">使用此元件的產品清單：</h4>
+                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        ${component.products.map(prod => `
+                            <li class="flex items-center space-x-2 text-sm text-slate-700 bg-white p-2 rounded">
+                                <svg class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>${prod}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        // ==================== 事件綁定 ====================
+
+        /**
+         * 分頁切換
+         */
+        tabContainer.addEventListener('click', (e) => {
+            const button = e.target.closest('.tab-button');
+            if (!button) return;
+
+            const tabName = button.dataset.tab;
+            switchTab(tabName);
+        });
+
+        window.switchTab = function(tabName) {
+            // 更新按鈕樣式
+            tabContainer.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('border-indigo-500', 'text-indigo-600');
+                btn.classList.add('border-transparent', 'text-slate-500');
+            });
+            const activeButton = tabContainer.querySelector(`[data-tab="${tabName}"]`);
+            if (activeButton) {
+                activeButton.classList.add('border-indigo-500', 'text-indigo-600');
+                activeButton.classList.remove('border-transparent', 'text-slate-500');
+            }
+
+            // 渲染對應內容
+            switch (tabName) {
+                case 'overview':
+                    renderOverviewTab();
+                    break;
+                case 'complexity':
+                    renderComplexityTab();
+                    break;
+                case 'commonality':
+                    renderCommonalityTab();
+                    break;
+                case 'compatibility':
+                    renderCompatibilityTab();
+                    break;
+            }
+        };
+
+        /**
+         * 顯示產品詳情 Modal
+         */
+        function showProductModal(productName) {
+            const product = productConfigAnalysis.find(p => p.name === productName);
+            if (!product) return;
+
+            modalProductName.textContent = product.name;
+            
+            // 計算適用的規則數量
+            const applicableRules = compatibilityRules.filter(rule => 
+                rule.models.some(model => model === product.name)
+            );
+            const mandatoryCount = applicableRules.filter(r => r.type === 'Mandatory').length;
+            const incompatibleCount = applicableRules.filter(r => r.type === 'Incompatible').length;
+            
+            // 顯示配置數量
+            const hasRules = applicableRules.length > 0;
+            const filtered = hasRules && product.theoreticalCount > product.count;
+            
+            if (filtered) {
+                modalProductCount.innerHTML = `
+                    <span class="text-green-600 font-bold">${product.count.toLocaleString()}</span> 種有效組態
+                    <span class="text-slate-400 mx-2">|</span>
+                    <span class="text-slate-500">基礎組態：${(product.baseCount || 0).toLocaleString()}</span>
+                    <span class="text-slate-400 mx-2">|</span>
+                    <span class="text-purple-600">適用 ${mandatoryCount} 條相依${incompatibleCount > 0 ? ` / ${incompatibleCount} 條相斥` : ''}規則</span>
+                `;
+            } else if (hasRules) {
+                modalProductCount.innerHTML = `
+                    <span class="font-bold">${product.count.toLocaleString()}</span> 種組態
+                    <span class="text-slate-400 mx-2">|</span>
+                    <span class="text-slate-500">基礎組態：${(product.baseCount || 0).toLocaleString()}</span>
+                    <span class="text-slate-400 mx-2">|</span>
+                    <span class="text-purple-600">適用 ${mandatoryCount} 條相依${incompatibleCount > 0 ? ` / ${incompatibleCount} 條相斥` : ''}規則</span>
+                `;
+            } else {
+                modalProductCount.innerHTML = `
+                    總組態數量：<span class="font-bold">${product.count.toLocaleString()}</span> 種
+                    <span class="text-slate-400 mx-2">|</span>
+                    <span class="text-slate-500">基礎組態：${(product.baseCount || 0).toLocaleString()}</span>
+                `;
+            }
+
+            // 按照 categoryType 分組
+            const groupedDetails = {
+                'Base': [],
+                'Component': [],
+                'Add-on': []
+            };
+
+            product.details.forEach(choice => {
+                if (groupedDetails[choice.categoryType]) {
+                    groupedDetails[choice.categoryType].push(choice);
+                }
+            });
+
+            let detailsHtml = '<div class="space-y-6">';
+            
+            // 渲染每個分組
+            ['Base', 'Component', 'Add-on'].forEach(type => {
+                if (groupedDetails[type].length > 0) {
+                    detailsHtml += `
+                        <div>
+                            <p class="text-xs text-slate-400 mb-3 uppercase tracking-wide">${type}</p>
+                            <div class="space-y-4">
+                                ${groupedDetails[type].map(choice => `
+                                    <div class="border-l-4 ${choice.rule === '必選' ? 'border-red-500' : choice.rule === '多選' ? 'border-purple-500' : 'border-green-500'} pl-4 bg-white">
+                                        <h4 class="font-semibold text-slate-800 mb-2">${choice.category}</h4>
+                                        <p class="text-sm text-slate-600 mb-3">
+                                            規則：<span class="font-medium ${choice.rule === '必選' ? 'text-red-600' : choice.rule === '多選' ? 'text-purple-600' : 'text-green-600'}">${choice.rule}</span> 
+                                            ${choice.rule === '多選' ? `(${choice.options.length} 個選項可多選，共 ${choice.count} 種組合)` : `(${choice.count} 選 1)`}
+                                        </p>
+                                        <div class="flex flex-wrap gap-2">
+                                            ${choice.options.map(opt => `
+                                                <span class="text-xs font-medium py-1.5 px-3 rounded-full ${opt === 'None' ? 'bg-slate-100 text-slate-600 border border-slate-300' : choice.rule === '多選' ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}">
+                                                    ${opt}
+                                                </span>
+                                            `).join('')}
+                                        </div>
+                                        ${choice.rule === '多選' ? '<p class="text-xs text-slate-500 mt-2">💡 可選擇任意數量的組合（包括「無」或多個配件）</p>' : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            detailsHtml += '</div>';
+
+            // 如果有適用的規則，顯示在最下方
+            if (applicableRules.length > 0) {
+                detailsHtml += `
+                    <div class="mt-8 pt-6 border-t border-slate-200">
+                        <h3 class="text-lg font-semibold text-slate-800 mb-4">適用的相依相斥規則</h3>
+                        <div class="space-y-3">
+                            ${applicableRules.map((rule, index) => {
+                                const typeColor = rule.type === 'Mandatory' ? 'green' : 'red';
+                                const typeLabel = rule.type === 'Mandatory' ? '相依 (Mandatory)' : '互斥 (Incompatible)';
+                                const description = rule.type === 'Mandatory' 
+                                    ? '如果選擇 First Group 中的任一項，則必須選擇 Second Group 中的任一項'
+                                    : 'First Group 和 Second Group 不能同時選擇（雙向互斥）';
+                                
+                                return `
+                                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                        <div class="flex items-center justify-between mb-2">
+                                            <span class="text-sm font-medium text-slate-700">規則 ${index + 1}</span>
+                                            <span class="px-3 py-1 text-xs font-medium rounded-full bg-${typeColor}-100 text-${typeColor}-700">
+                                                ${typeLabel}
+                                            </span>
+                                        </div>
+                                        <p class="text-xs text-slate-600 mb-3">${description}</p>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div>
+                                                <p class="text-xs font-medium text-slate-700 mb-2">First Group (條件)</p>
+                                                <div class="flex flex-wrap gap-1">
+                                                    ${rule.firstGroup.map(item => `
+                                                        <span class="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-200">${item}</span>
+                                                    `).join('')}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs font-medium text-slate-700 mb-2">Second Group (結果)</p>
+                                                <div class="flex flex-wrap gap-1">
+                                                    ${rule.secondGroup.map(item => `
+                                                        <span class="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-200">${item}</span>
+                                                    `).join('')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            modalProductDetails.innerHTML = detailsHtml || '<p class="text-slate-500">此產品沒有可配置的選項。</p>';
+            productModal.classList.remove('hidden');
+        }
+
+        // Modal 關閉事件
+        modalCloseButton.addEventListener('click', () => productModal.classList.add('hidden'));
+        productModal.addEventListener('click', (e) => {
+            if (e.target === productModal) productModal.classList.add('hidden');
+        });
+
+        // 子元件查詢 Modal 關閉事件
+        componentSearchModalClose.addEventListener('click', () => componentSearchModal.classList.add('hidden'));
+        componentSearchModal.addEventListener('click', (e) => {
+            if (e.target === componentSearchModal) componentSearchModal.classList.add('hidden');
+        });
+
+        // 子元件查詢 Modal 內的搜尋事件
+        componentSearchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.trim().toLowerCase();
+            if (searchTerm.length < 2) {
+                componentSearchResults.innerHTML = '';
+                return;
+            }
+
+            const matches = componentCommonality.filter(c => 
+                c.name.toLowerCase().includes(searchTerm)
+            );
+
+            if (matches.length === 0) {
+                componentSearchResults.innerHTML = '<p class="text-slate-500">找不到符合的元件</p>';
+                return;
+            }
+
+            displayReverseSearchResults(matches[0], componentSearchResults);
+        });
+
+        componentSearchSelect.addEventListener('change', (e) => {
+            const selectedComponent = e.target.value;
+            if (!selectedComponent) {
+                componentSearchResults.innerHTML = '';
+                return;
+            }
+
+            const component = componentCommonality.find(c => c.name === selectedComponent);
+            if (component) {
+                componentSearchInput.value = '';
+                displayReverseSearchResults(component, componentSearchResults);
+            }
+        });
+
+        // 產品項目點擊事件（使用事件委派）
+        tabContent.addEventListener('click', (e) => {
+            const button = e.target.closest('.product-item-button');
+            if (button) {
+                showProductModal(button.dataset.productName);
+            }
+        });
+
+        // ESC 鍵關閉 Modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                productModal.classList.add('hidden');
+                componentSearchModal.classList.add('hidden');
+            }
+        });
+
+        // ==================== 初始化 ====================
+        console.log('商城組態分析工具已載入');
+    </script>
+</body>
+</html>
